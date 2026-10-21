@@ -4,6 +4,21 @@ library(SKAT)
 library(ggplot2)
 library(pbapply)
 
+# Generate SSD_INFO file
+gen_ssd_info = function(dir_path, plink_fil_nam, ssdfil_name){
+  File.Bed <- paste0(dir_path, "plink_fil_nam", ".bed")
+  File.Bim <- paste0(dir_path, "plink_fil_nam", ".bim")
+  File.Fam <- paste0(dir_path, "plink_fil_nam", ".fam")
+  File.SetID <- paste0(dir_path, "ssdfil_name", ".SetID") #modified SetID or new file
+  File.SSD <- paste0(dir_path, "ssdfil_name", ".SSD")
+  File.Info <- paste0(dir_path, "ssdfil_name", ".SSD.info")
+  
+  Generate_SSD_SetID(File.Bed, File.Bim, File.Fam, File.SetID, File.SSD, File.Info)
+  
+  SSD.INFO <- Open_SSD(File.SSD, File.Info)
+  return(SSD.INFO)
+}
+
 ##################################
 #Flag cases with zero variants; retain cases with non-zero variants
 # report the number variants in cases
@@ -22,10 +37,69 @@ case_nonzero = function(Set_Index, SSD_INFO, fam_file){
 }
 
 # run example
-test_genes = lapply(seq(1, SSD.INFO$nSets, 1), function(x) case_nonzero(x, SSD_INFO, fam_file))
+# test_genes = lapply(seq(1, SSD.INFO$nSets, 1), function(x) case_nonzero(x, SSD_INFO, fam_file))
+
+##################################
+# Modify and update SSD.Info file
+# input files: SSD.SetID, SSD.Info
+# input args: set size
+# add custom args to modify the function
+# save as tab-separated output
+##################################
+
+update_ssdinfo = function(dir_path, ssdfil_name, SSD_INFO, case_var_fil, snp_set_size){
+  SSD_INFO$SetInfo = SSD_INFO$SetInfo[SSD_INFO$SetInfo$SetIndex %in% case_var_fil$Set_Index,]
+  SSD_INFO$SetInfo = SSD_INFO$SetInfo[SSD_INFO$SetInfo$SetSize > snp_set_size,]
+  SSD_INFO$nSets = dim(SSD_INFO$SetInfo)[1]
+  SSD_INFO$nSNPs = sum(SSD_INFO$SetInfo$SetSize)
+  SSD_SetID = read.delim(paste0(dir_path, ssdfil_name, ".SetID"), sep = "\t", stringsAsFactors = F, header = F)
+  SSD_SetID_mod = SSD_SetID[SSD_SetID$V1 %in% SSD_INFO$SetInfo$SetID,]
+  write.table(SSD_SetID_mod, paste0(dir_path, ssdfil_name, "_mod.SetID"),
+              sep = "\t", col.names = F, row.names = F, quote = F)
+  Close_SSD()
+}
 
 
 
+#Close_SSD() #after analysis is complete; close SSD.INFO.
 
+##################################
+#Input file preparation for SKAT
+#################################
 
+#Step.1 Generate SSD.INFO file
+SSD_INFO = gen_ssd_info(dir_path = dir_path, plink_fil_nam = plink_fil_nam, ssdfil_name = ssdfil_name)
+
+#Step.2 Generate FAM file with Covariates
+# Covariate file (tab separated) contains ancestry PCs and other nuisance variables
+# Ensure the cases are set to 1 and controls to 0 in FAM$Phenotype
+File.Fam <- paste0(dir_path, "plink_fil_nam", ".fam")
+File.Cov = paste0(dir_path, "cov_fil_nam", ".cov")
+FAM = Read_Plink_FAM_Cov(File.Fam, File.Cov, Is.binary = TRUE, cov_header = FALSE)
+
+#Step.3 Apply filters to update SSD_INFO file
+#3a. Retain genes with non-zero variants in cases
+#3b. Retain genes with SNP set size greater than 1
+
+burden_genes = lapply(seq(1, SSD.INFO$nSets, 1), function(x) case_nonzero(x, SSD_INFO, fam_file))
+burden_genes_df = data.frame(do.call("rbind", burden_genes))
+
+update_ssdinfo(dir_path = dir_path, ssdfil_name = ssdfil_name, SSD_INFO = SSD_INFO, 
+               case_var_fil = burden_genes_df, snp_set_size = 1)
+
+#Step.4 Generate the updated SSD_INFO file
+ssdfil_name_mod = paste0(dir_path, ssdfil_name, "_mod.SetID")
+SSD.INFO_mod = gen_ssd_info(dir_path = dir_path, plink_fil_nam = plink_fil_nam, ssdfil_name = ssdfil_name_mod)
+
+#Step.5 Tests
+obj = SKAT_Null_Model(Phenotype ~ Sex + Cov1 + Cov2, out_type = "D")
+
+out.skat_burden_rob = SKATBinary_Robust.SSD.All(SSD.INFO_mod, obj, method = "Burden")
+
+#Step.6 Merge results with case_MAC
+burden_filt = lapply(seq(1, SSD.INFO_mod$nSets, 1), function(x) case_nonzero(x, SSD.INFO_mod, fam_file))
+burden_filt_df = data.frame(do.call("rbind", burden_filt))
+
+df_res = cbind.data.frame(out.skat_burden_rob$results, "case_MAC" = burden_filt_df)
+df_res_fin = df_res[order(df_res$P.value, decreasing = F),]
 
