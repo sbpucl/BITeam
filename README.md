@@ -23,8 +23,8 @@ We apply rigorous statistical frameworks to discover casual genetic variants, ca
 
 🔬 3. Multiomics Integration.  
 
-Epilepsy is a complex network disease. Go look beyond DNA sequence variation, we integrate functional layers to understand the molecular mechanisms underlying network hyperexcitability.  
-• Transcriptomics (RNA-Seq): Bulk and single-nucleus RNA-seq (snRNA-seq) processing to identify differential gene expression (DGE) in resected human brain tissue or iPSC-derived neurons.  
+Epilepsy is a complex network disease. Going beyond DNA sequence variation, we integrate functional layers to understand the molecular mechanisms underlying network hyperexcitability.  
+• Transcriptomics (RNA-Seq): Bulk and single-nucleus RNA-seq (snRNA-seq) processing to identify differential gene expression (DGE) in human brain tissue atlas, gut neurons (ENS) and iPSC-derived neurons.  
 • Epigenomics (ATAC-Seq / Methylation): Mapping open chromatin regions and DNA methylation patterns to evaluate the impact of non-coding risk variants on cell-type-specific enhancers.  
 • Network & Multiomic Integration: Employing WGCNA, MOGONET, or MOFA+ to build multi-layered molecular networks, bridging the gap between non-coding genetic variants and cellular phenotypes.  
 
